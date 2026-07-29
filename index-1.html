@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Content Collaboration Manager — Dwi Lestari</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Ornamen bunga lily (dekorasi, opacity rendah) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="lily-flower" viewBox="-50 -50 100 100">
+      <g fill="currentColor">
+        <ellipse cx="0" cy="-27" rx="9" ry="23" transform="rotate(0)"/>
+        <ellipse cx="0" cy="-27" rx="9" ry="23" transform="rotate(60)"/>
+        <ellipse cx="0" cy="-27" rx="9" ry="23" transform="rotate(120)"/>
+        <ellipse cx="0" cy="-27" rx="9" ry="23" transform="rotate(180)"/>
+        <ellipse cx="0" cy="-27" rx="9" ry="23" transform="rotate(240)"/>
+        <ellipse cx="0" cy="-27" rx="9" ry="23" transform="rotate(300)"/>
+        <circle cx="0" cy="0" r="7"/>
+      </g>
+    </symbol>
+  </defs>
+</svg>
+<svg class="floral floral-tl" viewBox="-50 -50 100 100" aria-hidden="true"><use href="#lily-flower"/></svg>
+<svg class="floral floral-br" viewBox="-50 -50 100 100" aria-hidden="true"><use href="#lily-flower"/></svg>
+<svg class="floral floral-tr" viewBox="-50 -50 100 100" aria-hidden="true"><use href="#lily-flower"/></svg>
+
+<div class="app">
+
+  <!-- Banner pengingat deadline -->
+  <div class="reminder-banner" id="reminderBanner" hidden>
+    <span class="reminder-text">🌸 Jangan lupa, ada kerja sama yang segera jatuh tempo.</span>
+    <button class="btn-icon" id="btnCloseBanner" aria-label="Tutup pengingat"><i data-lucide="x"></i></button>
+  </div>
+
+  <!-- ===== DASHBOARD VIEW ===== -->
+  <div class="view" id="viewDashboard">
+    <header class="topbar">
+      <div class="greet">
+        <h1>🌸 Halo, Dwi.</h1>
+        <p>Semua kerja sama brand kamu, dalam satu tempat.</p>
+      </div>
+      <button class="btn-primary" id="btnAdd">
+        <i data-lucide="plus"></i><span>Tambah Kerja Sama</span>
+      </button>
+    </header>
+
+    <section class="summary-grid" id="summaryGrid">
+      <button class="summary-card sc-baru" data-filter="baru">
+        <span class="summary-icon">📩</span>
+        <span class="summary-count" id="cntBaru">0</span>
+        <span class="summary-label">Kerja Sama Masuk</span>
+      </button>
+      <button class="summary-card sc-dikerjakan" data-filter="dikerjakan">
+        <span class="summary-icon">🟡</span>
+        <span class="summary-count" id="cntDikerjakan">0</span>
+        <span class="summary-label">Sedang Dikerjakan</span>
+      </button>
+      <button class="summary-card sc-deadline" data-filter="deadline">
+        <span class="summary-icon">⏰</span>
+        <span class="summary-count" id="cntDeadline">0</span>
+        <span class="summary-label">Deadline Dekat</span>
+      </button>
+      <button class="summary-card sc-pembayaran" data-filter="pembayaran">
+        <span class="summary-icon">💰</span>
+        <span class="summary-count" id="cntPembayaran">0</span>
+        <span class="summary-label">Menunggu Pembayaran</span>
+      </button>
+      <button class="summary-card sc-selesai" data-filter="riwayat">
+        <span class="summary-icon">✅</span>
+        <span class="summary-count" id="cntSelesai">0</span>
+        <span class="summary-label">Selesai</span>
+      </button>
+    </section>
+
+    <div class="toolbar">
+      <div class="search-box">
+        <i data-lucide="search"></i>
+        <input type="text" id="searchInput" placeholder="Cari brand, PIC, atau platform...">
+      </div>
+    </div>
+
+    <nav class="filter-tabs" id="filterTabs">
+      <button class="filter-tab active" data-filter="semua">Semua</button>
+      <button class="filter-tab" data-filter="baru">Baru Masuk</button>
+      <button class="filter-tab" data-filter="dikerjakan">Dikerjakan</button>
+      <button class="filter-tab" data-filter="deadline">Deadline</button>
+      <button class="filter-tab" data-filter="pembayaran">Pembayaran</button>
+      <button class="filter-tab" data-filter="riwayat">Riwayat</button>
+    </nav>
+
+    <main class="card-grid" id="cardGrid"></main>
+
+    <div class="empty-state" id="emptyState" hidden>
+      <span class="empty-emoji">🌸</span>
+      <h3>Belum ada kerja sama</h3>
+      <p>Yuk tambahkan kerja sama pertamamu.</p>
+    </div>
+  </div>
+
+  <!-- ===== DETAIL VIEW ===== -->
+  <div class="view" id="viewDetail" hidden>
+    <header class="topbar topbar-sub">
+      <button class="btn-back" id="btnBackFromDetail"><i data-lucide="chevron-left"></i>Kembali</button>
+      <div class="topbar-actions">
+        <button class="btn-icon" id="btnEditDetail" aria-label="Edit"><i data-lucide="pencil"></i></button>
+        <button class="btn-icon btn-icon-danger" id="btnDeleteDetail" aria-label="Hapus"><i data-lucide="trash-2"></i></button>
+      </div>
+    </header>
+    <div class="detail-content" id="detailContent"></div>
+  </div>
+
+  <!-- ===== RIWAYAT VIEW ===== -->
+  <div class="view" id="viewRiwayat" hidden>
+    <header class="topbar topbar-sub">
+      <button class="btn-back" id="btnBackFromRiwayat"><i data-lucide="chevron-left"></i>Kembali</button>
+      <h2>Riwayat</h2>
+    </header>
+    <div class="search-box">
+      <i data-lucide="search"></i>
+      <input type="text" id="searchRiwayat" placeholder="Cari di riwayat...">
+    </div>
+    <div class="riwayat-list" id="riwayatList"></div>
+    <div class="empty-state" id="emptyRiwayat" hidden>
+      <span class="empty-emoji">🗂️</span>
+      <h3>Belum ada riwayat</h3>
+      <p>Kerja sama yang selesai akan muncul di sini.</p>
+    </div>
+  </div>
+
+  <footer class="app-footer">
+    <button class="footer-btn" id="btnBackup"><i data-lucide="shield-check"></i><span>Backup Data</span></button>
+    <button class="footer-btn" id="btnExport"><i data-lucide="download"></i><span>Export JSON</span></button>
+    <button class="footer-btn" id="btnImport"><i data-lucide="upload"></i><span>Import JSON</span></button>
+    <button class="footer-btn footer-btn-danger" id="btnReset"><i data-lucide="rotate-ccw"></i><span>Reset Semua Data</span></button>
+    <input type="file" id="importFileInput" accept="application/json" hidden>
+  </footer>
+</div>
+
+<!-- Modal Tambah/Edit -->
+<div class="modal-overlay" id="modalAdd" hidden>
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="modalAddTitle">Tambah Kerja Sama</h2>
+      <button class="btn-icon" id="btnCloseModalAdd" aria-label="Tutup"><i data-lucide="x"></i></button>
+    </div>
+    <form id="formKerjaSama">
+      <div class="form-group">
+        <label for="fBrand">Nama Brand</label>
+        <input type="text" id="fBrand" required placeholder="mis. Skincare Glow Co.">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="fPic">Nama PIC</label>
+          <input type="text" id="fPic" placeholder="mis. Kak Rina">
+        </div>
+        <div class="form-group">
+          <label for="fWa">Nomor WhatsApp</label>
+          <input type="tel" id="fWa" placeholder="08xxxxxxxxxx">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="fPlatform">Platform</label>
+          <select id="fPlatform">
+            <option>TikTok</option>
+            <option>Instagram</option>
+            <option>Shopee</option>
+            <option>Affiliate</option>
+            <option>Lainnya</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="fJenis">Jenis Kerja Sama</label>
+          <select id="fJenis">
+            <option>Endorsement</option>
+            <option>Affiliate</option>
+            <option>Paid Promote</option>
+            <option>Barter Produk</option>
+            <option>Konten Kerja Sama</option>
+            <option>Lainnya</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="fDeadline">Deadline</label>
+          <input type="date" id="fDeadline" required>
+        </div>
+        <div class="form-group">
+          <label for="fFee">Fee (Rp)</label>
+          <input type="number" id="fFee" min="0" placeholder="0" inputmode="numeric">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="fStatus">Status</label>
+        <select id="fStatus">
+          <option>Baru Masuk</option>
+          <option>Sedang Dikerjakan</option>
+          <option>Menunggu Revisi</option>
+          <option>Menunggu Upload</option>
+          <option>Menunggu Pembayaran</option>
+          <option>Selesai</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="fCatatan">Catatan</label>
+        <textarea id="fCatatan" rows="3" placeholder="Catatan tambahan (opsional)"></textarea>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" id="btnCancelForm">Batal</button>
+        <button type="submit" class="btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Konfirmasi -->
+<div class="modal-overlay" id="modalConfirm" hidden>
+  <div class="modal-box modal-box-sm">
+    <div class="modal-header">
+      <h2 id="confirmTitle">Konfirmasi</h2>
+    </div>
+    <p class="confirm-message" id="confirmMessage"></p>
+    <div class="form-actions">
+      <button class="btn-secondary" id="btnConfirmCancel">Batal</button>
+      <button class="btn-danger" id="btnConfirmYes">Ya, Lanjutkan</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="script.js"></script>
+</body>
+</html>
