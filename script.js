@@ -1,4 +1,5 @@
 
+
 /* ============ CONSTANTS ============ */
 const LS_KEY='saturnvss_dashboard_v1';
 const LS_KEY_OLD='dwi_dashboard_v1';
@@ -1085,30 +1086,335 @@ function shareInvoice(id){
 function saveProfile(){
   const g=id=>document.getElementById(id).value.trim();
   state.profile={name:g('set-name'),brandName:g('set-brandName'),email:g('set-email'),whatsapp:g('set-whatsapp'),address:g('set-address'),
-    bankName:g('set-bankName'),accountName:g('set-accountName'),accountNumber:g('set-accountNumber'),instagram:g('set-instagram'),tiktok:g('set-tiktok')};
-  save(); toast('Profile saved 🌸'); render();
-}
-function exportData(){
-  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download=`saturnvss-dashboard-backup-${todayISO()}.json`; a.click();
-  URL.revokeObjectURL(url);
-  toast('Data exported 🌸');
-}
-function importData(file){
-  if(!file)return;
-  const reader=new FileReader();
-  reader.onload=()=>{
-    try{ const data=JSON.parse(reader.result); state=data; if(!state.invoiceSeq)state.invoiceSeq={}; save(); applyTheme(); toast('Data imported 🌸'); nav('dashboard'); }
-    catch(e){ toast('File tidak valid'); }
-  };
-  reader.readAsText(file);
-}
-function applyTheme(){ document.documentElement.setAttribute('data-theme',state.theme==='dark'?'dark':'light'); }
 
-/* ============ INIT ============ */
-load();
-applyTheme();
-const initHash=location.hash.replace('#','');
-if(initHash){ const [v,id]=initHash.split('/'); route={view:v||'dashboard',params:id?{id}:{}}; }
-render();
+/* ============ CONSTANTS ============ */
+const LS_KEY='saturnvss_dashboard_v1';
+const LS_KEY_OLD='dwi_dashboard_v1';
+const TYPE_LIST=['Endorsement','Paid Promote','Affiliate','Campaign','Product Exchange','Other'];
+const PLATFORM_LIST=['TikTok','Instagram','YouTube','Shopee','Other'];
+const STATUS_LIST=['New','In Progress','Revision','Waiting Upload','Waiting Payment','Completed','Cancelled'];
+const PAYMENT_STATUS=['Pending','Invoiced','Paid','Partial','Overdue'];
+const INVOICE_STATUS=['Draft','Sent','Paid','Overdue','Cancelled'];
+const CHECKLIST=[['brief','Brief received'],['product','Product received'],['content','Content created'],['sent','Sent to brand'],['revision','Revision completed'],['uploaded','Uploaded'],['payment','Payment received']];
+
+/* ============ STATE ============ */
+let state=null;
+function seedState(){
+  const now=new Date();
+  const iso=(d)=>d.toISOString().slice(0,10);
+  const addDays=(n)=>{const d=new Date(); d.setDate(d.getDate()+n); return iso(d);};
+  return {
+    profile:{name:'Saturnvss',brandName:'Saturnvss',email:'',whatsapp:'',address:'',bankName:'',accountName:'',accountNumber:'',instagram:'',tiktok:''},
+    theme:'light',
+    invoiceSeq:{},
+    collabs:[
+      {id:uid(),brand:'Wardah Beauty',pic:'Kak Nadia',whatsapp:'6281234567890',type:'Endorsement',platform:'TikTok',deadline:addDays(0),fee:1500000,status:'In Progress',notes:'',checklist:{brief:true,product:true,content:false,sent:false,revision:false,uploaded:false,payment:false},timeline:[{date:new Date().toISOString(),text:'Produk diterima.'}],payment:{status:'Pending',invoiceId:null,invoiceNumber:'',invoiceDate:'',dueDate:'',amount:1500000,method:'',paymentDate:'',notes:''},createdAt:new Date().toISOString()},
+      {id:uid(),brand:'Somethinc',pic:'Kak Rani',whatsapp:'6281234567891',type:'Paid Promote',platform:'Instagram',deadline:addDays(1),fee:800000,status:'Revision',notes:'',checklist:{brief:true,product:true,content:true,sent:true,revision:false,uploaded:false,payment:false},timeline:[{date:new Date().toISOString(),text:'Brand meminta revisi caption.'}],payment:{status:'Pending',invoiceId:null,invoiceNumber:'',invoiceDate:'',dueDate:'',amount:800000,method:'',paymentDate:'',notes:''},createdAt:new Date().toISOString()},
+      {id:uid(),brand:'Brand XYZ',pic:'Kak Sarah',whatsapp:'6281234567892',type:'Campaign',platform:'TikTok',deadline:addDays(3),fee:2000000,status:'New',notes:'',checklist:{brief:false,product:false,content:false,sent:false,revision:false,uploaded:false,payment:false},timeline:[],payment:{status:'Pending',invoiceId:null,invoiceNumber:'',invoiceDate:'',dueDate:'',amount:2000000,method:'',paymentDate:'',notes:''},createdAt:new Date().toISOString()},
+      {id:uid(),brand:'Scarlett Whitening',pic:'Kak Dini',whatsapp:'6281234567893',type:'Affiliate',platform:'Shopee',deadline:addDays(-2),fee:500000,status:'Completed',notes:'',checklist:{brief:true,product:true,content:true,sent:true,revision:true,uploaded:true,payment:true},timeline:[{date:new Date().toISOString(),text:'Konten sudah tayang, payment diterima.'}],payment:{status:'Paid',invoiceId:null,invoiceNumber:'',invoiceDate:'',dueDate:'',amount:500000,method:'Transfer Bank',paymentDate:addDays(-1),notes:''},createdAt:new Date().toISOString()}
+    ],
+    invoices:[]
+  };
+}
+function load(){
+  try{
+    let raw=localStorage.getItem(LS_KEY);
+    if(!raw){ raw=localStorage.getItem(LS_KEY_OLD); } // migrate from earlier version's storage key
+    state=raw?JSON.parse(raw):seedState();
+  }catch(e){state=seedState();}
+  if(!state.invoiceSeq)state.invoiceSeq={};
+  if(state.profile && (state.profile.name==='Dwi Lestari')) state.profile.name='Saturnvss';
+  if(state.profile && (state.profile.brandName==='Dwi Lestari')) state.profile.brandName='Saturnvss';
+  save();
+}
+function save(){ localStorage.setItem(LS_KEY,JSON.stringify(state)); }
+
+/* ============ UTILS ============ */
+function uid(){return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
+function rp(n){ n=Number(n)||0; return 'Rp'+n.toLocaleString('id-ID');}
+function fmtDate(s){ if(!s)return '-'; const d=new Date(s+ (s.length===10?'T00:00:00':'')); if(isNaN(d))return s; return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); }
+function fmtDateShort(s){ if(!s)return '-'; const d=new Date(s+ (s.length===10?'T00:00:00':'')); if(isNaN(d))return s; return d.toLocaleDateString('id-ID',{day:'numeric',month:'short'}); }
+function todayISO(){return new Date().toISOString().slice(0,10);}
+function daysUntil(dateStr){
+  if(!dateStr)return null;
+  const d=new Date(dateStr+'T00:00:00'); const t=new Date(); t.setHours(0,0,0,0);
+  return Math.round((d-t)/86400000);
+}
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(window._toastTimer); window._toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
+}
+function icons(){ if(window.lucide) lucide.createIcons(); }
+
+function collabDeadlineState(c){
+  if(c.status==='Completed'||c.status==='Cancelled')return null;
+  const du=daysUntil(c.deadline);
+  if(du<0)return 'overdue';
+  if(du===0)return 'today';
+  if(du<=3)return 'soon';
+  return 'normal';
+}
+function deadlineBadge(c){
+  const s=collabDeadlineState(c);
+  if(!s)return '';
+  const du=daysUntil(c.deadline);
+  if(s==='overdue')return `<span class="badge badge-overdue"><i data-lucide="alert-circle" style="width:11px;height:11px"></i> OVERDUE</span>`;
+  if(s==='today')return `<span class="badge badge-today">Today</span>`;
+  if(s==='soon')return `<span class="badge badge-peach">${du} hari lagi</span>`;
+  return `<span class="badge badge-pink">${fmtDateShort(c.deadline)}</span>`;
+}
+function paymentBadge(c){
+  const st=c.payment.status;
+  const map={Pending:'badge-muted',Invoiced:'badge-peach',Paid:'badge-success',Partial:'badge-peach',Overdue:'badge-overdue'};
+  return `<span class="badge ${map[st]||'badge-muted'}">${st==='Pending'&&c.status==='Completed'?'PAYMENT PENDING':st}</span>`;
+}
+function statusBadge(status){
+  const map={New:'badge-pink','In Progress':'badge-peach',Revision:'badge-peach','Waiting Upload':'badge-peach','Waiting Payment':'badge-today',Completed:'badge-success',Cancelled:'badge-muted'};
+  return `<span class="badge ${map[status]||'badge-pink'}">${status}</span>`;
+}
+function progressPct(c){
+  const keys=CHECKLIST.map(x=>x[0]);
+  const done=keys.filter(k=>c.checklist[k]).length;
+  return Math.round(done/keys.length*100);
+}
+
+/* ============ ROUTER ============ */
+let route={view:'dashboard',params:{}};
+function nav(view,params={}){
+  route={view,params};
+  location.hash='#'+view+(params.id?'/'+params.id:'');
+  render();
+  window.scrollTo(0,0);
+}
+window.addEventListener('hashchange',()=>{
+  const h=location.hash.replace('#','');
+  const [view,id]=h.split('/');
+  route={view:view||'dashboard',params:id?{id}:{}};
+  render();
+});
+
+/* ============ SHELL ============ */
+const NAV_ITEMS=[
+  {v:'dashboard',label:'Dashboard',icon:'layout-dashboard'},
+  {v:'collaborations',label:'Collaborations',icon:'heart-handshake'},
+  {v:'calendar',label:'Calendar',icon:'calendar-days'},
+  {v:'invoices',label:'Invoices',icon:'file-text'},
+  {v:'payments',label:'Payments',icon:'wallet'},
+  {v:'history',label:'History',icon:'history'},
+  {v:'analytics',label:'Analytics',icon:'bar-chart-3'},
+];
+const BOTTOM_NAV=[
+  {v:'dashboard',label:'Home',icon:'home'},
+  {v:'collaborations',label:'Collab',icon:'heart-handshake'},
+  {v:'calendar',label:'Calendar',icon:'calendar-days'},
+  {v:'history',label:'History',icon:'history'},
+  {v:'more',label:'More',icon:'menu'},
+];
+
+function shellHTML(inner){
+  const active=route.view;
+  return `
+  <svg class="lily-watermark" viewBox="0 0 200 200" fill="none"><path d="M100 20 C 60 40, 60 100, 100 180 C140 100, 140 40, 100 20 Z" fill="currentColor"/><path d="M20 100 C 40 60, 100 60, 180 100 C100 140, 40 140, 20 100 Z" fill="currentColor" opacity=".6"/></svg>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="flower">🌸</div>
+        <div><div class="name">${esc(state.profile.name||'Saturnvss')}</div><div class="role">Creator Dashboard</div></div>
+      </div>
+      <div class="nav-group">
+        ${NAV_ITEMS.map(n=>`<button class="nav-item ${active===n.v?'active':''}" data-nav="${n.v}"><i data-lucide="${n.icon}"></i>${n.label}</button>`).join('')}
+      </div>
+      <div class="sidebar-footer">
+        <button class="nav-item ${active==='settings'?'active':''}" data-nav="settings"><i data-lucide="settings"></i>Settings</button>
+        <button class="nav-item" data-action="backup"><i data-lucide="database"></i>Backup Data</button>
+      </div>
+    </aside>
+    <div class="main">
+      <div class="topbar">
+        <div class="topbar-greeting">
+          <h1>${topbarTitle()}</h1>
+          <p>${topbarSubtitle()}</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="icon-btn" data-action="search"><i data-lucide="search"></i></button>
+          <button class="icon-btn" data-action="notif"><span class="dot"></span><i data-lucide="bell"></i></button>
+          <div class="avatar" data-nav="settings">${(state.profile.name||'D').trim().charAt(0).toUpperCase()}</div>
+        </div>
+      </div>
+      <div class="container" id="view-root">${inner}</div>
+    </div>
+  </div>
+  <div class="bottom-nav">
+    ${BOTTOM_NAV.map(n=>`<button class="bnav-item ${active===n.v?'active':''}" data-nav="${n.v==='more'?'more':n.v}"><i data-lucide="${n.icon}"></i>${n.label}</button>`).join('')}
+  </div>
+  <button class="fab" data-action="add-collab"><i data-lucide="plus"></i></button>
+  `;
+}
+function topbarTitle(){
+  const t={dashboard:'Good '+(new Date().getHours()<12?'morning':new Date().getHours()<18?'afternoon':'evening')+', '+ (state.profile.name||'Saturnvss').split(' ')[0]+' 🌸',
+  collaborations:'Collaborations',calendar:'Calendar',invoices:'Invoices',payments:'Payments',history:'History',analytics:'Analytics',settings:'Settings',
+  'collab-detail':'Collaboration','invoice-create':'Create Invoice','invoice-detail':'Invoice'};
+  return t[route.view]||'Saturnvss';
+}
+function topbarSubtitle(){
+  const t={dashboard:"Let's keep your collaborations organized.",collaborations:'Semua kerja sama dalam satu tempat.',calendar:'Deadline, upload, dan jadwal pembayaran.',
+  invoices:'Buat dan kelola invoice profesional.',payments:'Pantau status pembayaran setiap kerja sama.',history:'Kerja sama yang sudah selesai.',analytics:'Ringkasan performa kerja sama.',
+  settings:'Profil invoice & preferensi aplikasi.'};
+  return t[route.view]||'';
+}
+
+/* ============ MAIN RENDER ============ */
+function render(){
+  let inner='';
+  if(route.view==='dashboard')inner=viewDashboard();
+  else if(route.view==='collaborations')inner=viewCollaborations();
+  else if(route.view==='collab-detail')inner=viewCollabDetail(route.params.id);
+  else if(route.view==='calendar')inner=viewCalendar();
+  else if(route.view==='invoices')inner=viewInvoices();
+  else if(route.view==='invoice-create')inner=viewInvoiceCreate(route.params.id);
+  else if(route.view==='invoice-detail')inner=viewInvoiceDetail(route.params.id);
+  else if(route.view==='payments')inner=viewPayments();
+  else if(route.view==='history')inner=viewHistory();
+  else if(route.view==='analytics')inner=viewAnalytics();
+  else if(route.view==='settings')inner=viewSettings();
+  else if(route.view==='more')inner=viewMore();
+  else inner=viewDashboard();
+  document.getElementById('app').innerHTML=shellHTML(inner);
+  icons();
+  afterRender();
+}
+function afterRender(){
+  if(route.view==='analytics') drawCharts();
+}
+
+/* ============ VIEW: DASHBOARD ============ */
+function viewDashboard(){
+  const cs=state.collabs;
+  const active=cs.filter(c=>!['Completed','Cancelled'].includes(c.status));
+  const soon=cs.filter(c=>{const s=collabDeadlineState(c); return s==='soon'||s==='today'||s==='overdue';});
+  const completed=cs.filter(c=>c.status==='Completed');
+  const pendingPay=cs.filter(c=>c.payment.status!=='Paid'&&c.status!=='Cancelled');
+  const earnings=cs.filter(c=>c.payment.status==='Paid').reduce((s,c)=>s+Number(c.fee||0),0);
+
+  const stats=[
+    ['heart-handshake',cs.length,'Total Collaboration'],
+    ['zap',active.length,'Active'],
+    ['clock',soon.length,'Deadline Soon'],
+    ['check-circle-2',completed.length,'Completed'],
+    ['banknote',pendingPay.length,'Pending Payment'],
+    ['sparkles',rp(earnings),'Total Earnings'],
+  ];
+  const attention=cs.filter(c=>{
+    if(c.status==='Cancelled')return false;
+    const s=collabDeadlineState(c);
+    return s==='overdue'||s==='today'||s==='soon'||c.status==='Revision'||c.status==='Waiting Upload'||(c.status==='Completed'&&c.payment.status!=='Paid');
+  }).sort((a,b)=>daysUntil(a.deadline)-daysUntil(b.deadline));
+
+  const upcoming=cs.filter(c=>!['Completed','Cancelled'].includes(c.status)).sort((a,b)=>new Date(a.deadline)-new Date(b.deadline)).slice(0,6);
+
+  return `
+  <div class="stat-grid">
+    ${stats.map(s=>`<div class="card stat-card"><div class="top"><div class="icon-wrap"><i data-lucide="${s[0]}"></i></div></div><div class="value">${s[1]}</div><div class="label">${s[2]}</div></div>`).join('')}
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2><i data-lucide="alert-circle" style="width:16px;height:16px;color:var(--overdue)"></i> Needs Attention</h2></div>
+    ${attention.length===0?`<div class="card"><div class="empty-state" style="padding:34px 20px;"><i data-lucide="check-circle-2"></i><div class="t1">All caught up 🌸</div><div class="t2">Tidak ada yang butuh perhatian sekarang.</div></div></div>`:
+      attention.slice(0,6).map(c=>attnCard(c)).join('')}
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2><i data-lucide="calendar-clock" style="width:16px;height:16px"></i> Upcoming Deadlines</h2><a class="link" data-nav="calendar">View calendar</a></div>
+    <div class="card" style="padding:6px 4px;">
+      ${upcoming.length===0?`<div class="empty-state" style="padding:30px 20px;"><i data-lucide="calendar"></i><div class="t1">No deadlines yet</div></div>`:
+      upcoming.map(c=>{
+        const du=daysUntil(c.deadline); let tag=fmtDateShort(c.deadline);
+        if(du===0)tag='Today'; else if(du===1)tag='Tomorrow'; else if(du<0)tag='Overdue';
+        return `<div class="attn-card" style="border:none; border-bottom:1px solid var(--border); border-radius:0; margin-bottom:0; cursor:pointer;" data-nav="collab-detail" data-id="${c.id}">
+          <div class="stripe" style="background:${du<0?'var(--overdue)':du===0?'var(--today)':du<=3?'var(--peach)':'var(--primary)'}"></div>
+          <div class="body"><div class="brand">${esc(c.brand)}</div><div class="meta">${esc(c.type)} • ${tag}</div></div>
+          ${statusBadge(c.status)}
+        </div>`;
+      }).join('')}
+    </div>
+  </div>
+  `;
+}
+function attnCard(c){
+  const s=collabDeadlineState(c);
+  const stripe=s==='overdue'?'var(--overdue)':s==='today'?'var(--today)':s==='soon'?'var(--peach)':'var(--primary)';
+  let reason=deadlineBadge(c);
+  if(c.status==='Revision')reason=`<span class="badge badge-peach">Waiting revision</span>`;
+  if(c.status==='Waiting Upload')reason=`<span class="badge badge-peach">Waiting upload</span>`;
+  if(c.status==='Completed'&&c.payment.status!=='Paid')reason=`<span class="badge badge-overdue">Payment pending</span>`;
+  return `<div class="attn-card">
+    <div class="stripe" style="background:${stripe}"></div>
+    <div class="body">
+      <div class="brand">${esc(c.brand)}</div>
+      <div class="meta">${esc(c.type)} • ${esc(c.platform)}</div>
+      <div style="margin-top:6px;">${reason}</div>
+      <div class="fee">${rp(c.fee)}</div>
+    </div>
+    <button class="go" data-nav="collab-detail" data-id="${c.id}">View</button>
+  </div>`;
+}
+
+/* ============ VIEW: COLLABORATIONS ============ */
+let collabFilter={status:'All',search:'',platform:'',type:'',sort:'deadline'};
+function viewCollaborations(){
+  let list=[...state.collabs];
+  const f=collabFilter;
+  if(f.status==='Active')list=list.filter(c=>!['Completed','Cancelled'].includes(c.status));
+  else if(f.status==='Deadline Soon')list=list.filter(c=>['soon','today','overdue'].includes(collabDeadlineState(c)));
+  else if(f.status==='Waiting Payment')list=list.filter(c=>c.payment.status!=='Paid'&&!['Cancelled'].includes(c.status));
+  else if(f.status==='Completed')list=list.filter(c=>c.status==='Completed');
+  else if(f.status==='Cancelled')list=list.filter(c=>c.status==='Cancelled');
+  if(f.platform)list=list.filter(c=>c.platform===f.platform);
+  if(f.type)list=list.filter(c=>c.type===f.type);
+  if(f.search)list=list.filter(c=>(c.brand+c.pic+c.notes).toLowerCase().includes(f.search.toLowerCase()));
+  if(f.sort==='deadline')list.sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
+  else list.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+
+  const chips=['All','Active','Deadline Soon','Waiting Payment','Completed','Cancelled'];
+  return `
+  <div class="filter-row">${chips.map(c=>`<button class="chip ${f.status===c?'active':''}" data-filter-status="${c}">${c}</button>`).join('')}</div>
+  <div class="search-box"><i data-lucide="search"></i><input id="collab-search" placeholder="Cari brand, PIC, catatan..." value="${esc(f.search)}"></div>
+  <div class="select-row">
+    <select id="filter-platform"><option value="">All Platforms</option>${PLATFORM_LIST.map(p=>`<option ${f.platform===p?'selected':''}>${p}</option>`).join('')}</select>
+    <select id="filter-type"><option value="">All Types</option>${TYPE_LIST.map(p=>`<option ${f.type===p?'selected':''}>${p}</option>`).join('')}</select>
+    <select id="filter-sort"><option value="deadline" ${f.sort==='deadline'?'selected':''}>Sort: Deadline</option><option value="latest" ${f.sort==='latest'?'selected':''}>Sort: Latest</option></select>
+  </div>
+
+  ${list.length===0?`<div class="card"><div class="empty-state">
+      <svg viewBox="0 0 100 100" fill="none"><path d="M50 10 C 30 20, 30 50, 50 90 C70 50, 70 20, 50 10 Z" stroke="currentColor" stroke-width="4"/></svg>
+      <div class="t1">No collaborations yet 🌸</div><div class="t2">Your next collaboration starts here.</div>
+      <button class="btn btn-primary btn-sm t1-btn" style="margin-top:14px" data-action="add-collab"><i data-lucide="plus"></i>Add Collaboration</button>
+    </div></div>`:`
+  <div class="collab-list mobile-only">
+    ${list.map(c=>collabCard(c)).join('')}
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Brand</th><th>Type</th><th>Platform</th><th>Deadline</th><th>Fee</th><th>Status</th><th>Payment</th><th></th></tr></thead>
+      <tbody>
+        ${list.map(c=>`<tr style="cursor:pointer" data-nav="collab-detail" data-id="${c.id}">
+          <td><strong>${esc(c.brand)}</strong></td><td>${esc(c.type)}</td><td>${esc(c.platform)}</td>
+          <td>${deadlineBadge(c)||fmtDateShort(c.deadline)}</td><td class="fee">${rp(c.fee)}</td>
+          <td>${statusBadge(c.status)}</td><td>${paymentBadge(c)}</td>
+          <td><button class="btn btn-ghost btn-sm" data-nav="collab-detail" data-id="${c.id}">View</button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`}
+  `;
+}
+function collabCard(c){
+  return `<div class="card collab-card" data-nav="collab-detail" data-id="${c.id}">
+    <div class="row1"><div><div class="brand">${esc(c.brand)}</div><div class="type">${esc(c.type)} • ${esc(c.platform)}</div></div>${statusBadge(c.status)}</div>
+    <div class="grid">
+      <div><div class="k">Deadline</div><div class="v">${deadlineBadge(c)||fmtDateShort(c.deadline)}</div></div>
+      <div><div class="k">Fee</div><div class="v">${rp(c.fee)}</div></div>
+      <div><div class="k">Payment</div><div class="v">${paymentBadge(c)}</div></div>
+    </div>
+    <div class="actions"><button class="btn btn-ghost btn-sm btn-block" data-nav="collab-detail" 
