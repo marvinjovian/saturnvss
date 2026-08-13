@@ -634,7 +634,7 @@ function viewInvoiceDetail(id){
     <div class="inv-header">
       <svg class="lily" width="90" height="90" viewBox="0 0 100 100" style="position:absolute; top:-10px; right:10px;"><path d="M50 10 C 30 20, 30 50, 50 90 C70 50, 70 20, 50 10 Z" fill="currentColor"/></svg>
       <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-        <div><div class="brandname">${esc((state.profile.brandName||'SATURNVSS').toUpperCase())}</div><div class="brandsub">Creator &amp; Content Collaboration</div></div>
+        <div><div class="brandname">${esc((state.profile.brandName||'SATURNVSS').toUpperCase())}</div><div class="brandsub">Fashion &amp; Beauty Enthusiast</div></div>
         <div class="inv-title">INVOICE</div>
       </div>
     </div>
